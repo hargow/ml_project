@@ -1,0 +1,82 @@
+---
+title: "Predict Exercise Quality Through Wearable Device Data"
+output: html_document
+---
+
+### Introduction
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset). 
+
+### Read Data
+We first read the training and testing data sets.
+```{r warning=FALSE, cache=FALSE, message=FALSE}
+setwd("/Users/liang.huang/Documents/R/Coursera/machine learning/")
+library(caret)
+library(randomForest)
+data<-read.csv("pml-training.csv", na.strings=c("NA",""))
+testing <- read.csv("pml-testing.csv", na.strings=c("NA",""))
+dim(data); dim(testing) # dimensions of the data sets read in
+```
+
+### Create Training and Validation Sets
+Next, we divide the first data set into training and validation data sets, with 70% records in the testing set, and 30% in the validation set.
+```{r}
+# create training set and validation set
+set.seed(13398)
+inTraining<-createDataPartition(data$classe, p=0.7, list=FALSE)
+training<-data[inTraining,]
+validation<-data[-inTraining,]
+```
+
+### Clean Data
+Exploratory analysis reveals that some columns have over 90% rows with N/A or missing value, yet others have no N/A value. We remove these mostly N/A columns. We also remove the first 7 columns that are not suitable to be predictors, such as user names, time stamps, etc.
+````{r}
+training<-training[,colSums(is.na(training)) == 0] # remove columns with N/As
+training<-training[,-c(1:7)] # remove the first 7 columns that are not predictors
+````
+
+### Initial Model Fitting and Feature Selection
+The random forest algorithm is a popular classification method and is good with nonlinear features. However, it can also overfit. Through constructing an initial random forest and visualizing the distribution of each variable's importance, we noticed that 250 separates a small number (13) of important variables from a large number of less important variables. We will keep those higher than 250 for model prediction.
+````{r}
+model<-randomForest(classe~.,data=training) # initial random forest model
+imp<-importance(model) # get importance values
+hist(imp[,1]) # plot a distribution histogram
+
+# keep important variables and classe
+training<-training[,c(imp[,1]>=250,TRUE)] 
+````
+
+### Model Training
+Now we fit the reduced training data set with a random forest model. 
+````{r}
+model<-randomForest(classe~.,data=training)
+confusionMatrix(training$classe,predict(model,training))
+````
+The model correctly classifies 100% observations in the training set.
+
+### Model Validation
+We run this model on the validation data set.
+````{r}
+confusionMatrix(validation$classe,predict(model,validation))
+````
+The model achieves excellent results on the validation data set.
+
+Note that **we do not** need to remove columns in the validation and testing data sets. Apparently predict(model,newdata) matches column names in newdata with those in the model.
+
+### Test Data
+Finally we predict the 20 test case observations
+````{r}
+answers<-predict(model,testing)
+````
+And we generate the answer files for submission.
+```
+# generate answers
+pml_write_files = function(x){
+    n = length(x)
+    for(i in 1:n){
+        filename = paste0("problem_id_",i,".txt")
+        write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+    }
+}
+pml_write_files(answers)
+```
