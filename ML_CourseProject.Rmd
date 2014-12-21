@@ -1,6 +1,6 @@
 ---
 title: "Predict Exercise Quality Through Wearable Device Data"
-output: pdf_document
+output: html_document
 ---
 
 ### Introduction
